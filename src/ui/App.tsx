@@ -121,7 +121,7 @@ export function App({ queue }: { queue: TaskQueue }) {
         if (queue.clearDone()) setNotice("Cleared finished tasks.");
       }
     },
-    { isActive: isRawModeSupported !== false },
+    { isActive: isRawModeSupported === true },
   );
 
   // --- layout ---------------------------------------------------------------

@@ -1,10 +1,10 @@
 {
   "name": "snaffle",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Grab any video and convert anything, right from your terminal. Zero setup, your files stay on your disk.",
   "type": "module",
   "bin": {
-    "snaffle": "dist/cli.cjs"
+    "snaffle": "dist/cli.mjs"
   },
   "files": [
     "dist"
@@ -15,7 +15,7 @@
   "scripts": {
     "dev": "tsx src/index.tsx",
     "build": "tsup",
-    "start": "node dist/cli.cjs",
+    "start": "node dist/cli.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "prepublishOnly": "npm run build"
