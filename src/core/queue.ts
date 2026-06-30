@@ -75,8 +75,11 @@ export class TaskQueue extends EventEmitter {
     this.running.add(task.id);
     this.changed();
 
-    const run =
-      task.kind === "download"
+    // A stored runner (PDF jobs) wins; otherwise dispatch by kind.
+    const job = this.runners.get(task.id);
+    const run = job
+      ? job()
+      : task.kind === "download"
         ? runDownload(
             task.title,
             outputDir(),
@@ -101,9 +104,21 @@ export class TaskQueue extends EventEmitter {
       })
       .finally(() => {
         this.running.delete(task.id);
+        this.runners.delete(task.id);
         this.changed();
         this.pump();
       });
+  }
+
+  // A self-contained job (used by the PDF tools): the queue just runs the async
+  // function and reports its resolved output path, with no kind-specific logic.
+  private runners = new Map<string, () => Promise<string>>();
+  addJob(title: string, run: () => Promise<string>): void {
+    const task: Task = { id: `t${++this.seq}`, kind: "pdf", title, status: "queued" };
+    this.runners.set(task.id, run);
+    this.tasks = [task, ...this.tasks];
+    this.changed();
+    this.pump();
   }
 
   // For convert tasks the title is the basename (what we show); the real path was

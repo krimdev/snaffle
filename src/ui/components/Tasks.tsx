@@ -9,7 +9,7 @@ function pct(fraction?: number): string {
 }
 
 export function TaskRow({ task, barWidth = 22 }: { task: Task; barWidth?: number }) {
-  const kindTag = task.kind === "download" ? "get " : "conv";
+  const kindTag = task.kind === "download" ? "get " : task.kind === "pdf" ? "pdf " : "conv";
   const color =
     task.status === "done" ? COLOR.good : task.status === "error" ? COLOR.bad : COLOR.fox;
 

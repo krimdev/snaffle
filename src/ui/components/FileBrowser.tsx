@@ -9,24 +9,43 @@ const IS_WIN = process.platform === "win32";
 // Sentinel dir: the Windows "pick a drive" screen (above every drive root).
 export const DRIVES = "";
 
-// A keyboard file picker so you never have to type a path. Shows folders and the
-// media files you can actually convert (everything else is hidden). On Windows
-// you can step above a drive root to switch disks (C:, D:, …). `dir` is owned by
-// the parent so the location survives the format-menu round-trip.
+// A keyboard file picker so you never have to type a path. Shows folders plus the
+// files matching `accept` (everything else hidden). On Windows you can step above
+// a drive root to switch disks. `dir` is owned by the parent so the location
+// survives round-trips (format menu, etc.).
+//
+// Two modes:
+//  • single  — Enter on a file calls onPick (Convert).
+//  • multi   — Space toggles a file into `selected` (numbered in order); Enter on
+//              a file confirms the whole selection via onConfirm (PDF tools).
 export function FileBrowser({
   height,
   width,
   isActive,
   dir,
   onNavigate,
+  accept,
+  fileIcon = ICON.file,
+  emptyHint = "Nothing here. ← to go back.",
   onPick,
+  multi = false,
+  selected = [],
+  onToggle,
+  onConfirm,
 }: {
   height: number;
   width: number;
   isActive: boolean;
   dir: string;
   onNavigate: (dir: string) => void;
-  onPick: (path: string) => void;
+  accept?: (name: string) => boolean;
+  fileIcon?: string;
+  emptyHint?: string;
+  onPick?: (path: string) => void;
+  multi?: boolean;
+  selected?: string[];
+  onToggle?: (path: string) => void;
+  onConfirm?: () => void;
 }) {
   const [showHidden, setShowHidden] = useState(false);
   const [cursor, setCursor] = useState(0);
@@ -37,18 +56,16 @@ export function FileBrowser({
 
   const onDrives = dir === DRIVES;
   const entries = useMemo(
-    () => (onDrives ? listDrives() : listDir(dir, { showHidden, mediaOnly: true })),
-    [dir, showHidden, onDrives],
+    () => (onDrives ? listDrives() : listDir(dir, { showHidden, accept })),
+    [dir, showHidden, onDrives, accept],
   );
 
   const atRoot = !onDrives && isRoot(dir);
-  // A leading row to go up: ".." inside a tree, "drives" when sitting at a drive
-  // root on Windows, nothing at the very top.
   const showUp = !onDrives && (!atRoot || IS_WIN);
   const rows: (Entry | "up")[] = showUp ? ["up", ...entries] : entries;
 
   const clamped = Math.min(cursor, Math.max(0, rows.length - 1));
-  const listH = Math.max(3, height - 1); // one line for the path crumb
+  const listH = Math.max(2, height - 1); // one line for the path crumb
   const start = windowStart(clamped, rows.length, listH);
   const visible = rows.slice(start, start + listH);
 
@@ -56,17 +73,18 @@ export function FileBrowser({
     if (onDrives) return;
     const parent = dirname(dir);
     if (parent === dir || isRoot(dir)) {
-      // At a drive root: on Windows step out to the drive list, else stay put.
-      if (IS_WIN) setDir(DRIVES);
+      if (IS_WIN) setDir(DRIVES); // step out to the drive list
       return;
     }
     setDir(parent);
   };
 
-  const enter = (row: Entry | "up"): void => {
+  const onRow = (row: Entry | "up"): void => {
     if (row === "up") return goUp();
-    if (row.isDir) setDir(row.path);
-    else onPick(row.path);
+    if (row.isDir) return setDir(row.path);
+    // It's a file: single mode picks it; multi mode confirms the selection.
+    if (multi) onConfirm?.();
+    else onPick?.(row.path);
   };
 
   useInput(
@@ -80,7 +98,10 @@ export function FileBrowser({
       else if (key.leftArrow || key.backspace || key.delete) goUp();
       else if (key.return || key.rightArrow) {
         const row = rows[clamped];
-        if (row) enter(row);
+        if (row) onRow(row);
+      } else if (input === " " && multi) {
+        const row = rows[clamped];
+        if (row && row !== "up" && !row.isDir) onToggle?.(row.path);
       } else if (input === "h" && !onDrives) {
         setShowHidden((v) => !v);
         setCursor(0);
@@ -90,9 +111,6 @@ export function FileBrowser({
   );
 
   const crumb = onDrives ? "Select a drive" : truncateLeft(dir, Math.max(8, width - 4));
-  const emptyMsg = onDrives
-    ? "No drives found."
-    : "No videos or audio here — only convertible files show. ← to go back.";
 
   return (
     <Box flexDirection="column">
@@ -103,7 +121,7 @@ export function FileBrowser({
       </Box>
       {rows.length === 0 ? (
         <Box marginTop={1}>
-          <Text dimColor>{emptyMsg}</Text>
+          <Text dimColor>{onDrives ? "No drives found." : emptyHint}</Text>
         </Box>
       ) : (
         visible.map((row, i) => {
@@ -120,6 +138,7 @@ export function FileBrowser({
             return (
               <Box key="up">
                 {pointer}
+                {multi ? <Box width={3} flexShrink={0} /> : null}
                 <Text color={here ? COLOR.accent : undefined} dimColor={!here}>
                   {label}
                 </Text>
@@ -127,16 +146,25 @@ export function FileBrowser({
             );
           }
 
-          const icon = row.isDir ? ICON.folder : ICON.media;
-          const tint = here ? COLOR.accent : row.isDir ? COLOR.alt : COLOR.text;
+          const pick = multi && !row.isDir ? selected.indexOf(row.path) : -1;
+          const chosen = pick >= 0;
+          const icon = row.isDir ? ICON.folder : fileIcon;
+          const tint = here ? COLOR.accent : chosen ? COLOR.fox : row.isDir ? COLOR.alt : COLOR.text;
           return (
             <Box key={row.path}>
               {pointer}
+              {multi ? (
+                <Box width={3} flexShrink={0}>
+                  <Text color={COLOR.fox} bold>
+                    {chosen ? `${pick + 1}.` : ""}
+                  </Text>
+                </Box>
+              ) : null}
               <Box flexShrink={0} marginRight={1}>
                 <Text color={tint}>{icon}</Text>
               </Box>
               <Box flexGrow={1} minWidth={0}>
-                <Text color={tint} bold={here} wrap="truncate-end">
+                <Text color={tint} bold={here || chosen} wrap="truncate-end">
                   {row.name}
                   {row.isDir ? "/" : ""}
                 </Text>

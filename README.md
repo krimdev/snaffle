@@ -47,9 +47,16 @@ the formats that make sense:
 | Video | MP4 · smaller/compressed MP4 · MP3 · M4A |
 | Audio | MP3 · M4A · WAV |
 
+**PDF — quick tools, all offline**
+Three keyboard-driven tools (powered by pure-JS [pdf-lib](https://github.com/Hopding/pdf-lib), no extra binaries):
+
+- **Images → PDF** — multi-select JPG/PNG (numbered in the order you pick them) into one PDF
+- **Merge PDFs** — combine several PDFs into one
+- **Split / extract** — pull pages out of a PDF with a simple spec like `1-3,5`
+
 **Queue**
-Downloads and conversions run together with live progress, speed and ETA, newest
-first.
+Downloads, conversions and PDF jobs run together with live progress, speed and
+ETA, newest first.
 
 ## Keys
 
@@ -60,7 +67,7 @@ first.
 
 - Trim a clip (from / to)
 - Quality / resolution picker before download
-- PDF tools (merge / split / images → PDF)
+- PDF: compress, reorder/rotate pages
 - Pause / resume / cancel in the queue
 
 ## A note on usage

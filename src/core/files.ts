@@ -5,7 +5,6 @@ export interface Entry {
   name: string;
   path: string;
   isDir: boolean;
-  isMedia: boolean;
   sizeBytes: number;
 }
 
@@ -37,6 +36,18 @@ export function isMediaFile(name: string): boolean {
   return mediaKind(name) !== null;
 }
 
+// Image types pdf-lib can embed (JPEG + PNG only), and PDFs — used as browser
+// filters for the PDF tools.
+const IMAGE = new Set([".jpg", ".jpeg", ".png"]);
+
+export function isImageFile(name: string): boolean {
+  return IMAGE.has(ext(name));
+}
+
+export function isPdfFile(name: string): boolean {
+  return ext(name) === ".pdf";
+}
+
 // True when `dir` is a filesystem root (a Windows drive root like "C:\" or "/"),
 // so we know whether going up means "drive list" / "nowhere".
 export function isRoot(dir: string): boolean {
@@ -54,7 +65,7 @@ export function listDrives(): Entry[] {
     const root = `${letter}:\\`;
     try {
       if (existsSync(root)) {
-        out.push({ name: `${letter}:`, path: root, isDir: true, isMedia: false, sizeBytes: 0 });
+        out.push({ name: `${letter}:`, path: root, isDir: true, sizeBytes: 0 });
       }
     } catch {
       // unreadable drive — skip
@@ -65,9 +76,9 @@ export function listDrives(): Entry[] {
 
 export interface ListOpts {
   showHidden?: boolean;
-  // When true, files that aren't media are omitted entirely (folders always stay
-  // so you can keep navigating).
-  mediaOnly?: boolean;
+  // Keep a file only if this returns true (folders always stay so you can keep
+  // navigating). Omit to show every file.
+  accept?: (name: string) => boolean;
 }
 
 /**
@@ -89,9 +100,8 @@ export function listDir(dir: string, opts: ListOpts = {}): Entry[] {
     try {
       const st = statSync(path);
       const isDir = st.isDirectory();
-      const media = !isDir && isMediaFile(name);
-      if (!isDir && opts.mediaOnly && !media) continue;
-      entries.push({ name, path, isDir, isMedia: media, sizeBytes: isDir ? 0 : st.size });
+      if (!isDir && opts.accept && !opts.accept(name)) continue;
+      entries.push({ name, path, isDir, sizeBytes: isDir ? 0 : st.size });
     } catch {
       // unreadable entry — skip it
     }

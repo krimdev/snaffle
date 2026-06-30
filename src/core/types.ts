@@ -1,4 +1,4 @@
-export type TaskKind = "download" | "convert";
+export type TaskKind = "download" | "convert" | "pdf";
 
 export type TaskStatus = "queued" | "running" | "done" | "error";
 

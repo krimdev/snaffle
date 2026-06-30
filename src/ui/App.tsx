@@ -6,8 +6,9 @@ import { Footer } from "./components/Footer";
 import { Splash } from "./components/Splash";
 import { Grab } from "./views/Grab";
 import { Convert } from "./views/Convert";
+import { Pdf } from "./views/Pdf";
 import { Queue } from "./views/Queue";
-import { footerHints, type Region } from "./keymap";
+import { footerHints, type Region, type PdfStep } from "./keymap";
 import { NAV, RAIL_WIDTH, type Section } from "./sections";
 import { LOGO_WIDTH } from "./logo";
 import { wrapStep } from "./move";
@@ -43,6 +44,9 @@ export function App({ queue }: { queue: TaskQueue }) {
   // The file chosen in Convert, awaiting a format choice. App owns it so Esc can
   // route correctly (cancel the menu vs. leave the pane).
   const [picked, setPicked] = useState<string | null>(null);
+  // The PDF view reports its current step here purely so the footer hints match
+  // (the PDF view owns its own Esc/back navigation).
+  const [pdfStep, setPdfStep] = useState<PdfStep>("menu");
 
   // Mirror the queue into React state (the queue mutates tasks in place, so copy
   // the array to force a re-render).
@@ -87,6 +91,13 @@ export function App({ queue }: { queue: TaskQueue }) {
     setRegion("content");
   };
 
+  const onPdfJob = (title: string, run: () => Promise<string>): void => {
+    queue.addJob(title, run);
+    setNotice(title);
+    setSection("queue");
+    setRegion("content");
+  };
+
   const idx = Math.max(0, NAV.findIndex((n) => n.key === section));
 
   useInput(
@@ -108,6 +119,9 @@ export function App({ queue }: { queue: TaskQueue }) {
       }
       // region === "content": views own their own keys; here we only handle
       // leaving the pane and the queue's clear shortcut.
+      // The PDF view runs its own multi-step Esc/back navigation, so don't touch
+      // its keys here.
+      if (section === "pdf") return;
       if (key.escape) {
         // In the convert format menu, Esc backs out to the file list first.
         if (picked) {
@@ -164,6 +178,15 @@ export function App({ queue }: { queue: TaskQueue }) {
               onPick={onPick}
               onChoose={onChoose}
             />
+          ) : section === "pdf" ? (
+            <Pdf
+              width={contentWidth}
+              height={panelH}
+              focused={contentFocused}
+              onRunJob={onPdfJob}
+              onExit={() => setRegion("sidebar")}
+              onStep={setPdfStep}
+            />
           ) : (
             <Queue width={contentWidth} height={panelH} focused={contentFocused} tasks={tasks} />
           )}
@@ -172,7 +195,7 @@ export function App({ queue }: { queue: TaskQueue }) {
 
       {showFooter ? (
         <Box>
-          <Footer hints={footerHints(region, section, !!picked)} />
+          <Footer hints={footerHints(region, section, !!picked, pdfStep)} />
         </Box>
       ) : null}
     </Box>

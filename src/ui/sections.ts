@@ -1,6 +1,6 @@
 import { GUTTER } from "./theme";
 
-export type Section = "grab" | "convert" | "queue";
+export type Section = "grab" | "convert" | "pdf" | "queue";
 
 export interface NavItem {
   key: Section;
@@ -8,12 +8,13 @@ export interface NavItem {
   badged?: boolean;
 }
 
-// Two groups: the things you start (grab a link, convert a file) and the place
-// you watch them run (the queue, badged with its active count).
+// Two groups: the things you start (grab a link, convert a file, PDF tools) and
+// the place you watch them run (the queue, badged with its active count).
 export const GROUPS: NavItem[][] = [
   [
     { key: "grab", label: "Grab" },
     { key: "convert", label: "Convert" },
+    { key: "pdf", label: "PDF" },
   ],
   [{ key: "queue", label: "Queue", badged: true }],
 ];

@@ -4,6 +4,8 @@ import { Panel } from "../components/Panel";
 import { FileBrowser } from "../components/FileBrowser";
 import { ConvertMenu } from "../components/ConvertMenu";
 import { targetsFor, type ConvertTarget } from "../../convert/targets";
+import { isMediaFile } from "../../core/files";
+import { ICON } from "../theme";
 
 // The "pick a file" screen. Two steps: browse to a file, then choose a format.
 // `picked` (owned by App so it can route Esc correctly) decides which step shows.
@@ -42,6 +44,9 @@ export function Convert({
           isActive={focused}
           dir={dir}
           onNavigate={setDir}
+          accept={isMediaFile}
+          fileIcon={ICON.media}
+          emptyHint="No videos or audio here — only convertible files show. ← to go back."
           onPick={onPick}
         />
       )}
