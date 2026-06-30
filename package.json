@@ -1,0 +1,53 @@
+{
+  "name": "snaffle",
+  "version": "0.1.0",
+  "description": "Grab any video and convert anything, right from your terminal. Zero setup, your files stay on your disk.",
+  "type": "module",
+  "bin": {
+    "snaffle": "./dist/cli.cjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx src/index.tsx",
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "video-downloader",
+    "youtube",
+    "tiktok",
+    "facebook",
+    "yt-dlp",
+    "ffmpeg",
+    "converter",
+    "tui",
+    "terminal",
+    "cli",
+    "ink",
+    "zero-setup"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0",
+    "ink": "^7.0.5",
+    "react": "^19.2.7",
+    "youtube-dl-exec": "^3.0.10"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.2",
+    "@types/react": "^19.2.17",
+    "ink-testing-library": "^4.0.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
+  }
+}
