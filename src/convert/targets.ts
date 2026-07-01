@@ -46,10 +46,18 @@ const ALL: Record<string, ConvertTarget> = {
     ext: "wav",
     args: (i, o) => ["-y", "-i", i, "-vn", o],
   },
+  // Trim is handled specially (it needs start/end times and keeps the original
+  // container), so its args are never used — it only appears as a menu entry.
+  trim: {
+    id: "trim",
+    label: "Trim · cut a section",
+    ext: "",
+    args: () => [],
+  },
 };
 
-const VIDEO_TARGETS = ["mp4", "compress", "mp3", "m4a"];
-const AUDIO_TARGETS = ["mp3", "m4a", "wav"];
+const VIDEO_TARGETS = ["mp4", "compress", "mp3", "m4a", "trim"];
+const AUDIO_TARGETS = ["mp3", "m4a", "wav", "trim"];
 
 // The targets that make sense for a given input file.
 export function targetsFor(name: string): ConvertTarget[] {

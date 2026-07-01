@@ -19,6 +19,8 @@ export interface Task {
   // For download tasks: grab the audio only and save it as MP3 instead of the
   // full video. Ignored for convert tasks.
   audioOnly?: boolean;
+  // For download tasks: cap the video height (1080/720/480); undefined = best.
+  maxHeight?: number;
   // For convert tasks: the conversion preset id (see convert/targets).
   target?: string;
 }

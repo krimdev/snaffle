@@ -63,3 +63,44 @@ export function runConvert(
     });
   });
 }
+
+/**
+ * Cut the section [fromSec, toSec) out of a media file, keeping its original
+ * container and codecs (stream copy — fast and lossless). Resolves with the
+ * output path.
+ */
+export function runTrim(
+  input: string,
+  fromSec: number,
+  toSec: number,
+  dir: string,
+  handlers: ConvertHandlers = {},
+): Promise<string> {
+  if (!ffmpegPath) {
+    return Promise.reject(new Error("ffmpeg binary not found (ffmpeg-static failed to install)"));
+  }
+  const ext = extname(input);
+  const output = join(dir, `${basename(input, ext)} (trim)${ext}`);
+  const total = toSec - fromSec;
+
+  return new Promise((resolve, reject) => {
+    // -ss before -i seeks fast; -t sets how long to copy.
+    const proc = spawn(ffmpegPath as string, [
+      "-y", "-ss", String(fromSec), "-i", input, "-t", String(total), "-c", "copy", output,
+    ]);
+
+    proc.stderr.on("data", (chunk: Buffer) => {
+      const t = chunk.toString().match(TIME);
+      if (t && total > 0) handlers.onProgress?.(Math.min(1, toSeconds(t[1]!, t[2]!, t[3]!) / total));
+    });
+    proc.on("error", reject);
+    proc.on("close", (code) => {
+      if (code === 0) {
+        handlers.onProgress?.(1);
+        resolve(output);
+      } else {
+        reject(new Error(`ffmpeg exited with code ${code}`));
+      }
+    });
+  });
+}

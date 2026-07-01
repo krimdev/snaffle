@@ -3,33 +3,41 @@ import { homedir } from "node:os";
 import { Panel } from "../components/Panel";
 import { FileBrowser } from "../components/FileBrowser";
 import { ConvertMenu } from "../components/ConvertMenu";
+import { TrimInput } from "../components/TrimInput";
 import { targetsFor, type ConvertTarget } from "../../convert/targets";
 import { isMediaFile } from "../../core/files";
 import { ICON } from "../theme";
 
-// The "pick a file" screen. Two steps: browse to a file, then choose a format.
-// `picked` (owned by App so it can route Esc correctly) decides which step shows.
+// The "pick a file" screen. Steps: browse to a file → choose a format → (for
+// Trim) enter start/end. `picked` and `trimming` are owned by App so Esc routes
+// correctly across the steps.
 export function Convert({
   width,
   height,
   focused,
   picked,
+  trimming,
   onPick,
   onChoose,
+  onTrim,
 }: {
   width: number;
   height: number;
   focused: boolean;
   picked: string | null;
+  trimming: boolean;
   onPick: (path: string) => void;
   onChoose: (target: ConvertTarget) => void;
+  onTrim: (from: number, to: number) => void;
 }) {
   // Held here (not in FileBrowser) so the location survives the format-menu step.
   const [dir, setDir] = useState<string>(() => homedir());
   const inner = Math.max(10, width - 4);
   return (
     <Panel title="convert" width={width} height={height} focused={focused}>
-      {picked ? (
+      {picked && trimming ? (
+        <TrimInput file={picked} isActive={focused} onSubmit={onTrim} />
+      ) : picked ? (
         <ConvertMenu
           file={picked}
           targets={targetsFor(picked)}

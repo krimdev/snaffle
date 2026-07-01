@@ -42,7 +42,11 @@ export class TaskQueue extends EventEmitter {
     return true;
   }
 
-  add(kind: TaskKind, input: string, opts: { audioOnly?: boolean; target?: string } = {}): Task {
+  add(
+    kind: TaskKind,
+    input: string,
+    opts: { audioOnly?: boolean; maxHeight?: number; target?: string } = {},
+  ): Task {
     const value = stripQuotes(input);
     const task: Task = {
       id: `t${++this.seq}`,
@@ -50,6 +54,7 @@ export class TaskQueue extends EventEmitter {
       title: kind === "download" ? value : basename(value),
       status: "queued",
       audioOnly: kind === "download" ? opts.audioOnly : undefined,
+      maxHeight: kind === "download" ? opts.maxHeight : undefined,
       target: kind === "convert" ? opts.target : undefined,
     };
     // Convert tasks show the basename but run on the full path; remember it.
@@ -75,16 +80,16 @@ export class TaskQueue extends EventEmitter {
     this.running.add(task.id);
     this.changed();
 
-    // A stored runner (PDF jobs) wins; otherwise dispatch by kind.
+    // A stored runner (PDF / trim jobs) wins; otherwise dispatch by kind.
     const job = this.runners.get(task.id);
     const run = job
-      ? job()
+      ? job((f) => this.onProgress(task, f))
       : task.kind === "download"
         ? runDownload(
             task.title,
             outputDir(),
             { onProgress: (f, detail) => this.onProgress(task, f, detail) },
-            { audioOnly: task.audioOnly },
+            { audioOnly: task.audioOnly, maxHeight: task.maxHeight },
           )
         : runConvert(this.inputFor(task), outputDir(), targetById(task.target) ?? DEFAULT_TARGET, {
             onProgress: (f) => this.onProgress(task, f),
@@ -110,11 +115,12 @@ export class TaskQueue extends EventEmitter {
       });
   }
 
-  // A self-contained job (used by the PDF tools): the queue just runs the async
-  // function and reports its resolved output path, with no kind-specific logic.
-  private runners = new Map<string, () => Promise<string>>();
-  addJob(title: string, run: () => Promise<string>): void {
-    const task: Task = { id: `t${++this.seq}`, kind: "pdf", title, status: "queued" };
+  // A self-contained job (PDF tools, trim): the queue runs the async function —
+  // handing it a progress reporter — and records its resolved output path, with
+  // no kind-specific logic. `kind` only tags the row label.
+  private runners = new Map<string, (onProgress: (f?: number) => void) => Promise<string>>();
+  addJob(title: string, kind: TaskKind, run: (onProgress: (f?: number) => void) => Promise<string>): void {
+    const task: Task = { id: `t${++this.seq}`, kind, title, status: "queued" };
     this.runners.set(task.id, run);
     this.tasks = [task, ...this.tasks];
     this.changed();

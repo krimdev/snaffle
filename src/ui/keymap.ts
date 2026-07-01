@@ -11,6 +11,7 @@ export function footerHints(
   section: Section,
   picking = false,
   pdfStep?: PdfStep,
+  trimming = false,
 ): Hint[] {
   if (region === "sidebar") {
     return [
@@ -24,12 +25,20 @@ export function footerHints(
   if (section === "grab") {
     return [
       { keys: "←/→", label: "Video/Audio" },
+      { keys: "↑↓", label: "Quality" },
       { keys: "↵", label: "Grab" },
       SWITCH,
       { keys: "esc", label: "Back" },
     ];
   }
   if (section === "convert") {
+    if (trimming) {
+      return [
+        { keys: "type", label: "Start end e.g. 0:05 1:30" },
+        { keys: "↵", label: "Trim" },
+        { keys: "esc", label: "Back" },
+      ];
+    }
     if (picking) {
       return [
         { keys: "↑↓", label: "Format" },

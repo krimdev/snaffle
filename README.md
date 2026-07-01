@@ -34,7 +34,7 @@ Works with YouTube, TikTok, Facebook, Instagram, X, and 1000+ more (anything
 [yt-dlp](https://github.com/yt-dlp/yt-dlp) supports). Pick your output right on
 the screen:
 
-- **Video · MP4** — best quality video + audio, merged
+- **Video · MP4** — best video + audio, merged, with a quality picker (Best / 1080p / 720p / 480p)
 - **Audio · MP3** — just the sound, extracted to MP3
 
 **Convert — browse to a file**
@@ -44,8 +44,12 @@ the formats that make sense:
 
 | Input | Convert to |
 | --- | --- |
-| Video | MP4 · smaller/compressed MP4 · MP3 · M4A |
-| Audio | MP3 · M4A · WAV |
+| Video | MP4 · smaller/compressed MP4 · MP3 · M4A · **Trim** |
+| Audio | MP3 · M4A · WAV · **Trim** |
+
+**Trim** cuts a section out of any clip — pick the file, choose *Trim*, and type a
+start and end time (e.g. `0:05 1:30`). Fast and lossless (it keeps the original
+format).
 
 **PDF — quick tools, all offline**
 Three keyboard-driven tools (powered by pure-JS [pdf-lib](https://github.com/Hopding/pdf-lib), no extra binaries):
@@ -65,10 +69,9 @@ ETA, newest first.
 
 ## Roadmap
 
-- Trim a clip (from / to)
-- Quality / resolution picker before download
 - PDF: compress, reorder/rotate pages
 - Pause / resume / cancel in the queue
+- Subtitles / thumbnail options on download
 
 ## A note on usage
 

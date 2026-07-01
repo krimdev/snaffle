@@ -13,6 +13,8 @@ import { NAV, RAIL_WIDTH, type Section } from "./sections";
 import { LOGO_WIDTH } from "./logo";
 import { wrapStep } from "./move";
 import { isUrl } from "../core/detect";
+import { runTrim } from "../convert/ffmpeg";
+import { outputDir } from "../util/paths";
 import { basename } from "node:path";
 import type { ConvertTarget } from "../convert/targets";
 import type { TaskQueue } from "../core/queue";
@@ -44,6 +46,9 @@ export function App({ queue }: { queue: TaskQueue }) {
   // The file chosen in Convert, awaiting a format choice. App owns it so Esc can
   // route correctly (cancel the menu vs. leave the pane).
   const [picked, setPicked] = useState<string | null>(null);
+  // When the chosen convert format is "trim", we show a from/to prompt instead of
+  // queueing straight away. App owns it so Esc routes correctly.
+  const [trimming, setTrimming] = useState(false);
   // The PDF view reports its current step here purely so the footer hints match
   // (the PDF view owns its own Esc/back navigation).
   const [pdfStep, setPdfStep] = useState<PdfStep>("menu");
@@ -67,13 +72,13 @@ export function App({ queue }: { queue: TaskQueue }) {
     return () => clearTimeout(t);
   }, [notice]);
 
-  const onGrab = (value: string, audioOnly: boolean): void => {
+  const onGrab = (value: string, audioOnly: boolean, maxHeight?: number): void => {
     if (!isUrl(value)) {
       setNotice("That doesn't look like a link. Use Convert for local files.");
       return;
     }
-    queue.add("download", value, { audioOnly });
-    setNotice(audioOnly ? "Grabbing audio → MP3…" : "Grabbing video…");
+    queue.add("download", value, { audioOnly, maxHeight });
+    setNotice(audioOnly ? "Grabbing audio → MP3…" : `Grabbing video${maxHeight ? ` (${maxHeight}p)` : ""}…`);
     setSection("queue");
     setRegion("content");
   };
@@ -81,9 +86,14 @@ export function App({ queue }: { queue: TaskQueue }) {
   // Step 1: a file was picked — show the format menu (don't queue yet).
   const onPick = (path: string): void => setPicked(path);
 
-  // Step 2: a format was chosen — queue it and jump to the queue.
+  // Step 2: a format was chosen. "trim" opens a from/to prompt; anything else
+  // queues straight away and jumps to the queue.
   const onChoose = (target: ConvertTarget): void => {
     if (!picked) return;
+    if (target.id === "trim") {
+      setTrimming(true);
+      return;
+    }
     queue.add("convert", picked, { target: target.id });
     setNotice(`Converting ${basename(picked)} → ${target.ext.toUpperCase()}`);
     setPicked(null);
@@ -91,8 +101,22 @@ export function App({ queue }: { queue: TaskQueue }) {
     setRegion("content");
   };
 
+  // Step 3 (trim only): times entered — queue the cut and jump to the queue.
+  const onTrim = (from: number, to: number): void => {
+    if (!picked) return;
+    const file = picked;
+    queue.addJob(`Trim ${basename(file)}`, "convert", (onP) =>
+      runTrim(file, from, to, outputDir(), { onProgress: onP }),
+    );
+    setNotice(`Trimming ${basename(file)}…`);
+    setPicked(null);
+    setTrimming(false);
+    setSection("queue");
+    setRegion("content");
+  };
+
   const onPdfJob = (title: string, run: () => Promise<string>): void => {
-    queue.addJob(title, run);
+    queue.addJob(title, "pdf", run);
     setNotice(title);
     setSection("queue");
     setRegion("content");
@@ -123,7 +147,11 @@ export function App({ queue }: { queue: TaskQueue }) {
       // its keys here.
       if (section === "pdf") return;
       if (key.escape) {
-        // In the convert format menu, Esc backs out to the file list first.
+        // Convert steps back out one at a time: trim → format menu → file list.
+        if (trimming) {
+          setTrimming(false);
+          return;
+        }
         if (picked) {
           setPicked(null);
           return;
@@ -175,8 +203,10 @@ export function App({ queue }: { queue: TaskQueue }) {
               height={panelH}
               focused={contentFocused}
               picked={picked}
+              trimming={trimming}
               onPick={onPick}
               onChoose={onChoose}
+              onTrim={onTrim}
             />
           ) : section === "pdf" ? (
             <Pdf
@@ -195,7 +225,7 @@ export function App({ queue }: { queue: TaskQueue }) {
 
       {showFooter ? (
         <Box>
-          <Footer hints={footerHints(region, section, !!picked, pdfStep)} />
+          <Footer hints={footerHints(region, section, !!picked, pdfStep, trimming)} />
         </Box>
       ) : null}
     </Box>

@@ -14,6 +14,15 @@ export interface DownloadHandlers {
 export interface DownloadOptions {
   // Grab the audio only and convert it to MP3 (instead of the merged video).
   audioOnly?: boolean;
+  // Cap the video height (e.g. 1080, 720, 480). Omit for best available.
+  maxHeight?: number;
+}
+
+// yt-dlp format selector: best video+audio, optionally capped to a max height,
+// always with single-file fallbacks so odd sources still resolve.
+function videoFormat(maxHeight?: number): string {
+  if (!maxHeight) return "bv*+ba/b";
+  return `bv*[height<=${maxHeight}]+ba/b[height<=${maxHeight}]/b[height<=${maxHeight}]/bv*+ba/b`;
 }
 
 // yt-dlp with `--newline` prints one progress line per tick. We don't trust a
@@ -68,7 +77,7 @@ export async function runDownload(
       })
     : youtubeDl.exec(url, {
         ...common,
-        format: "bv*+ba/b",
+        format: videoFormat(options.maxHeight),
         mergeOutputFormat: "mp4",
       });
 
