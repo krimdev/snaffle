@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="snaffle_home.png" alt="snaffle running in a terminal: the SNAFFLE wordmark, a sidebar, and the Grab screen with a Video/Audio toggle" width="820">
+  <img src="snaffle.gif" alt="snaffle running in a terminal: grabbing a video, converting files, and PDF tools" width="820">
 </p>
 
 <h1 align="center">snaffle</h1>
