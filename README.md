@@ -8,7 +8,6 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/snaffle"><img src="https://img.shields.io/npm/v/snaffle?color=ff8c2b&label=npm" alt="npm version"></a>
-  <a href="https://www.npmjs.com/package/snaffle"><img src="https://img.shields.io/npm/dm/snaffle?color=ff8c2b" alt="npm downloads"></a>
   <img src="https://img.shields.io/node/v/snaffle?color=ff8c2b" alt="node version">
   <a href="LICENSE"><img src="https://img.shields.io/npm/l/snaffle?color=ff8c2b" alt="license"></a>
 </p>
