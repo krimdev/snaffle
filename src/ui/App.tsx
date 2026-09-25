@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, useApp, useInput, useStdin } from "ink";
-import { Header, headerHeight } from "./components/Header";
+import { Header, headerHeight, type Notice } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
 import { Footer } from "./components/Footer";
 import { Splash } from "./components/Splash";
-import { Grab } from "./views/Grab";
+import { Help } from "./components/Help";
+import { Grab, type GrabOptions } from "./views/Grab";
 import { Convert } from "./views/Convert";
 import { Pdf } from "./views/Pdf";
 import { Queue } from "./views/Queue";
@@ -12,15 +13,22 @@ import { footerHints, type Region, type PdfStep } from "./keymap";
 import { NAV, RAIL_WIDTH, type Section } from "./sections";
 import { LOGO_WIDTH } from "./logo";
 import { wrapStep } from "./move";
-import { isUrl } from "../core/detect";
+import { useSweep } from "./useFrame";
+import { useTerminalStatus } from "./useTerminalStatus";
 import { runTrim } from "../convert/ffmpeg";
+import { isImageFile, isMediaFile, isPdfFile } from "../core/files";
 import { outputDir } from "../util/paths";
+import { loadState, saveState } from "../util/state";
 import { basename } from "node:path";
 import type { ConvertTarget } from "../convert/targets";
 import type { TaskQueue } from "../core/queue";
-import type { Task } from "../core/types";
+import type { Task, TaskStatus } from "../core/types";
 
-const SPLASH_MS = 1600;
+// The full splash the first time; a quick flourish on later launches.
+const SPLASH_FIRST_MS = 1800;
+const SPLASH_MS = 900;
+const NOTICE_MS = 4000;
+const CELEBRATE_MS = 900;
 
 export function App({ queue }: { queue: TaskQueue }) {
   const { exit } = useApp();
@@ -38,11 +46,17 @@ export function App({ queue }: { queue: TaskQueue }) {
   }, []);
   const { cols, rows } = size;
 
+  const [splashMs] = useState(() => {
+    const launches = loadState().launches ?? 0;
+    saveState({ launches: launches + 1 });
+    return launches === 0 ? SPLASH_FIRST_MS : SPLASH_MS;
+  });
   const [splash, setSplash] = useState(true);
+  const [help, setHelp] = useState(false);
   const [section, setSection] = useState<Section>("grab");
   const [region, setRegion] = useState<Region>("content");
   const [tasks, setTasks] = useState<Task[]>(() => queue.list());
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
   // The file chosen in Convert, awaiting a format choice. App owns it so Esc can
   // route correctly (cancel the menu vs. leave the pane).
   const [picked, setPicked] = useState<string | null>(null);
@@ -52,35 +66,78 @@ export function App({ queue }: { queue: TaskQueue }) {
   // The PDF view reports its current step here purely so the footer hints match
   // (the PDF view owns its own Esc/back navigation).
   const [pdfStep, setPdfStep] = useState<PdfStep>("menu");
+  // A file browser's type-to-filter is open: Esc and letters belong to it.
+  const [filtering, setFiltering] = useState(false);
+  // Status of the task highlighted in the queue, for its footer hints.
+  const [queueSel, setQueueSel] = useState<TaskStatus | null>(null);
+  const onQueueSelect = useCallback((t: Task | null) => setQueueSel(t?.status ?? null), []);
+  // Bumped on every successful finish; sweeps a glint across the logo.
+  const [celebrate, setCelebrate] = useState(0);
+  const shine = useSweep(celebrate, CELEBRATE_MS);
 
   // Mirror the queue into React state (the queue mutates tasks in place, so copy
-  // the array to force a re-render).
+  // the array to force a re-render), and announce each task as it finishes.
   useEffect(() => {
     const onUpdate = (): void => setTasks([...queue.list()]);
+    const onSettled = (t: Task): void => {
+      if (t.status === "done") {
+        setNotice({ kind: "success", text: `Saved ${t.detail ?? t.title}` });
+        setCelebrate((n) => n + 1);
+      } else if (t.status === "error") {
+        setNotice({ kind: "error", text: `Failed: ${t.title} — ${t.error ?? "unknown error"}` });
+      }
+    };
     queue.on("update", onUpdate);
-    return () => void queue.off("update", onUpdate);
+    queue.on("settled", onSettled);
+    return () => {
+      queue.off("update", onUpdate);
+      queue.off("settled", onSettled);
+    };
   }, [queue]);
 
+  useTerminalStatus(tasks);
+
   useEffect(() => {
-    const t = setTimeout(() => setSplash(false), SPLASH_MS);
+    const t = setTimeout(() => setSplash(false), splashMs);
     return () => clearTimeout(t);
-  }, []);
+  }, [splashMs]);
 
   useEffect(() => {
     if (!notice) return;
-    const t = setTimeout(() => setNotice(null), 4000);
+    const t = setTimeout(() => setNotice(null), NOTICE_MS);
     return () => clearTimeout(t);
   }, [notice]);
 
-  const onGrab = (value: string, audioOnly: boolean, maxHeight?: number): void => {
-    if (!isUrl(value)) {
-      setNotice("That doesn't look like a link. Use Convert for local files.");
-      return;
-    }
-    queue.add("download", value, { audioOnly, maxHeight });
-    setNotice(audioOnly ? "Grabbing audio → MP3…" : `Grabbing video${maxHeight ? ` (${maxHeight}p)` : ""}…`);
+  const goQueue = (): void => {
     setSection("queue");
     setRegion("content");
+  };
+
+  // Grab stays put after queueing, so you can paste link after link; its own
+  // list shows them downloading.
+  const onGrab = (url: string, opts: GrabOptions): void => {
+    queue.add("download", url, opts);
+    const what = opts.audioOnly
+      ? `audio → MP3${opts.audioKbps ? ` (${opts.audioKbps}k)` : ""}`
+      : `video${opts.maxHeight ? ` (${opts.maxHeight}p)` : ""}`;
+    setNotice({ kind: "info", text: `Grabbing ${what}…` });
+  };
+
+  // A local file dropped (or pasted) into Grab: media goes to Convert's format
+  // menu; anything else gets pointed the right way.
+  const onDropFile = (path: string): void => {
+    const name = basename(path);
+    if (isMediaFile(name)) {
+      setPicked(path);
+      setTrimming(false);
+      setSection("convert");
+      setRegion("content");
+      setNotice({ kind: "info", text: `Picked ${name} — choose a format` });
+    } else if (isPdfFile(name) || isImageFile(name)) {
+      setNotice({ kind: "error", text: `${name} is a ${isPdfFile(name) ? "PDF" : "picture"} — use the PDF tools.` });
+    } else {
+      setNotice({ kind: "error", text: `snaffle can't convert ${name}.` });
+    }
   };
 
   // Step 1: a file was picked — show the format menu (don't queue yet).
@@ -95,39 +152,48 @@ export function App({ queue }: { queue: TaskQueue }) {
       return;
     }
     queue.add("convert", picked, { target: target.id });
-    setNotice(`Converting ${basename(picked)} → ${target.ext.toUpperCase()}`);
+    setNotice({ kind: "info", text: `Converting ${basename(picked)} → ${target.ext.toUpperCase()}` });
     setPicked(null);
-    setSection("queue");
-    setRegion("content");
+    goQueue();
   };
 
   // Step 3 (trim only): times entered — queue the cut and jump to the queue.
   const onTrim = (from: number, to: number): void => {
     if (!picked) return;
     const file = picked;
-    queue.addJob(`Trim ${basename(file)}`, "convert", (onP) =>
-      runTrim(file, from, to, outputDir(), { onProgress: onP }),
+    queue.addJob(`Trim ${basename(file)}`, "convert", (onP, signal) =>
+      runTrim(file, from, to, outputDir(), { onProgress: onP, signal }),
     );
-    setNotice(`Trimming ${basename(file)}…`);
+    setNotice({ kind: "info", text: `Trimming ${basename(file)}…` });
     setPicked(null);
     setTrimming(false);
-    setSection("queue");
-    setRegion("content");
+    goQueue();
   };
 
   const onPdfJob = (title: string, run: () => Promise<string>): void => {
-    queue.addJob(title, "pdf", run);
-    setNotice(title);
-    setSection("queue");
-    setRegion("content");
+    queue.addJob(title, "pdf", () => run());
+    setNotice({ kind: "info", text: title });
+    goQueue();
   };
 
   const idx = Math.max(0, NAV.findIndex((n) => n.key === section));
+  // Is a text entry capturing keystrokes right now? Then ? and q are just text.
+  const typing =
+    region === "content" &&
+    (section === "grab" || trimming || filtering || (section === "pdf" && pdfStep === "range"));
 
   useInput(
     (input, key) => {
       if (splash) {
         setSplash(false);
+        return;
+      }
+      if (help) {
+        setHelp(false);
+        return;
+      }
+      if (input === "?" && !typing) {
+        setHelp(true);
         return;
       }
       if (key.tab) {
@@ -147,6 +213,8 @@ export function App({ queue }: { queue: TaskQueue }) {
       // its keys here.
       if (section === "pdf") return;
       if (key.escape) {
+        // An open filter swallows Esc (the browser clears it).
+        if (filtering) return;
         // Convert steps back out one at a time: trim → format menu → file list.
         if (trimming) {
           setTrimming(false);
@@ -160,7 +228,7 @@ export function App({ queue }: { queue: TaskQueue }) {
         return;
       }
       if (section === "queue" && input === "c") {
-        if (queue.clearDone()) setNotice("Cleared finished tasks.");
+        if (queue.clearDone()) setNotice({ kind: "info", text: "Cleared finished tasks." });
       }
     },
     { isActive: isRawModeSupported === true },
@@ -178,54 +246,76 @@ export function App({ queue }: { queue: TaskQueue }) {
   const ruleWidth = Math.max(10, cols - 2);
 
   const downloadTasks = useMemo(() => tasks.filter((t) => t.kind === "download"), [tasks]);
-  const contentFocused = region === "content";
+  const contentFocused = region === "content" && !help;
 
-  if (splash) return <Splash rows={rows} cols={cols} />;
+  if (splash) return <Splash rows={rows} cols={cols} durationMs={splashMs} />;
 
   return (
     <Box flexDirection="column" paddingX={1}>
-      <Header width={ruleWidth} big={bigHeader} notice={notice} />
+      <Header width={ruleWidth} big={bigHeader} notice={notice} shine={shine} />
 
       <Box height={bodyH} marginTop={1} overflow="hidden">
-        <Sidebar section={section} focused={region === "sidebar"} activeCount={queue.activeCount} />
+        <Sidebar section={section} focused={region === "sidebar" && !help} activeCount={queue.activeCount} />
         <Box flexGrow={1} flexDirection="column">
-          {section === "grab" ? (
-            <Grab
-              width={contentWidth}
-              height={panelH}
-              focused={contentFocused}
-              onSubmit={onGrab}
-              tasks={downloadTasks}
-            />
-          ) : section === "convert" ? (
-            <Convert
-              width={contentWidth}
-              height={panelH}
-              focused={contentFocused}
-              picked={picked}
-              trimming={trimming}
-              onPick={onPick}
-              onChoose={onChoose}
-              onTrim={onTrim}
-            />
-          ) : section === "pdf" ? (
-            <Pdf
-              width={contentWidth}
-              height={panelH}
-              focused={contentFocused}
-              onRunJob={onPdfJob}
-              onExit={() => setRegion("sidebar")}
-              onStep={setPdfStep}
-            />
-          ) : (
-            <Queue width={contentWidth} height={panelH} focused={contentFocused} tasks={tasks} />
-          )}
+          {/* Help hides the view rather than replacing it, so its state survives. */}
+          {help ? <Help width={contentWidth} height={panelH} /> : null}
+          <Box display={help ? "none" : "flex"} flexDirection="column">
+            {section === "grab" ? (
+              <Grab
+                width={contentWidth}
+                height={panelH}
+                focused={contentFocused}
+                onSubmit={onGrab}
+                onDropFile={onDropFile}
+                tasks={downloadTasks}
+                outDir={outputDir()}
+              />
+            ) : section === "convert" ? (
+              <Convert
+                width={contentWidth}
+                height={panelH}
+                focused={contentFocused}
+                picked={picked}
+                trimming={trimming}
+                onPick={onPick}
+                onChoose={onChoose}
+                onTrim={onTrim}
+                onFilterChange={setFiltering}
+              />
+            ) : section === "pdf" ? (
+              <Pdf
+                width={contentWidth}
+                height={panelH}
+                focused={contentFocused}
+                onRunJob={onPdfJob}
+                onExit={() => setRegion("sidebar")}
+                onStep={setPdfStep}
+                onFilterChange={setFiltering}
+              />
+            ) : (
+              <Queue
+                width={contentWidth}
+                height={panelH}
+                focused={contentFocused}
+                tasks={tasks}
+                queue={queue}
+                notify={setNotice}
+                onSelect={onQueueSelect}
+              />
+            )}
+          </Box>
         </Box>
       </Box>
 
       {showFooter ? (
         <Box>
-          <Footer hints={footerHints(region, section, !!picked, pdfStep, trimming)} />
+          <Footer
+            hints={
+              help
+                ? [{ keys: "any key", label: "Close help" }]
+                : footerHints(region, section, { picking: !!picked, pdfStep, trimming, filtering, queueSel })
+            }
+          />
         </Box>
       ) : null}
     </Box>

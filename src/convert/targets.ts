@@ -10,6 +10,10 @@ export interface ConvertTarget {
   // Appended before the extension to keep distinct outputs from colliding in the
   // output folder (e.g. "clip (compressed).mp4" vs "clip.mp4").
   suffix?: string;
+  // One line shown next to the label in the format menu.
+  hint: string;
+  // Approximate output bitrate for audio-only targets, used to estimate size.
+  kbps?: number;
   args: (input: string, output: string) => string[];
 }
 
@@ -17,6 +21,7 @@ const ALL: Record<string, ConvertTarget> = {
   mp4: {
     id: "mp4",
     label: "Video · MP4",
+    hint: "Plays everywhere (H.264 + AAC)",
     ext: "mp4",
     suffix: "converted",
     args: (i, o) => ["-y", "-i", i, "-c:v", "libx264", "-crf", "23", "-preset", "veryfast", "-c:a", "aac", "-b:a", "192k", o],
@@ -24,6 +29,7 @@ const ALL: Record<string, ConvertTarget> = {
   compress: {
     id: "compress",
     label: "Compress · smaller MP4",
+    hint: "Much lighter file, slightly softer image",
     ext: "mp4",
     suffix: "compressed",
     args: (i, o) => ["-y", "-i", i, "-c:v", "libx264", "-crf", "30", "-preset", "slow", "-c:a", "aac", "-b:a", "128k", o],
@@ -31,18 +37,24 @@ const ALL: Record<string, ConvertTarget> = {
   mp3: {
     id: "mp3",
     label: "Audio · MP3",
+    hint: "Just the sound, universal",
+    kbps: 190,
     ext: "mp3",
     args: (i, o) => ["-y", "-i", i, "-vn", "-q:a", "2", o],
   },
   m4a: {
     id: "m4a",
     label: "Audio · M4A",
+    hint: "Just the sound, great on Apple devices",
+    kbps: 192,
     ext: "m4a",
     args: (i, o) => ["-y", "-i", i, "-vn", "-c:a", "aac", "-b:a", "192k", o],
   },
   wav: {
     id: "wav",
     label: "Audio · WAV",
+    hint: "Uncompressed, for editing",
+    kbps: 1411,
     ext: "wav",
     args: (i, o) => ["-y", "-i", i, "-vn", o],
   },
@@ -51,6 +63,7 @@ const ALL: Record<string, ConvertTarget> = {
   trim: {
     id: "trim",
     label: "Trim · cut a section",
+    hint: "Keep only a start→end part, lossless",
     ext: "",
     args: () => [],
   },

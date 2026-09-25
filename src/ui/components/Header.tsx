@@ -1,7 +1,19 @@
 import { Box, Text } from "ink";
 import { Logo } from "./Logo";
 import { Rule } from "./Rule";
-import { COLOR } from "../theme";
+import { COLOR, ICON } from "../theme";
+
+export type NoticeKind = "info" | "success" | "error";
+export interface Notice {
+  kind: NoticeKind;
+  text: string;
+}
+
+const STYLE: Record<NoticeKind, { icon: string; color: string }> = {
+  info: { icon: ICON.info, color: COLOR.accent },
+  success: { icon: ICON.done, color: COLOR.good },
+  error: { icon: ICON.fail, color: COLOR.bad },
+};
 
 // The persistent top banner: the wordmark centered, a reserved line for the
 // status notice (so the layout never jumps), and a full-width divider. On short
@@ -10,22 +22,31 @@ export function Header({
   width,
   big,
   notice,
+  shine,
 }: {
   width: number;
   big: boolean;
-  notice: string | null;
+  notice: Notice | null;
+  shine?: number;
 }) {
+  const style = notice ? STYLE[notice.kind] : null;
   return (
     <Box flexDirection="column">
       <Box width={width} flexDirection="column" alignItems="center">
         {big ? (
-          <Logo />
+          <Logo shine={shine} />
         ) : (
           <Text color={COLOR.accent} bold>
             snaffle
           </Text>
         )}
-        <Text color={COLOR.good}>{notice ?? " "}</Text>
+        {notice && style ? (
+          <Text color={style.color} wrap="truncate-end">
+            {`${style.icon} ${notice.text}`}
+          </Text>
+        ) : (
+          <Text> </Text>
+        )}
       </Box>
       <Rule width={width} />
     </Box>

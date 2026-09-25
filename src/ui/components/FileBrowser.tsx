@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { dirname } from "node:path";
 import { listDir, listDrives, isRoot, formatBytes, type Entry } from "../../core/files";
@@ -9,10 +9,22 @@ const IS_WIN = process.platform === "win32";
 // Sentinel dir: the Windows "pick a drive" screen (above every drive root).
 export const DRIVES = "";
 
+// Case-insensitive substring match; every space-separated word must appear.
+export function matchesFilter(name: string, query: string): boolean {
+  const n = name.toLowerCase();
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((w) => n.includes(w));
+}
+
 // A keyboard file picker so you never have to type a path. Shows folders plus the
 // files matching `accept` (everything else hidden). On Windows you can step above
 // a drive root to switch disks. `dir` is owned by the parent so the location
-// survives round-trips (format menu, etc.).
+// survives round-trips (format menu, etc.). Press `/` to filter the listing by
+// typing; the parent is told (onFilterChange) so Esc clears the filter instead
+// of leaving the pane.
 //
 // Two modes:
 //  • single  — Enter on a file calls onPick (Convert).
@@ -32,6 +44,7 @@ export function FileBrowser({
   selected = [],
   onToggle,
   onConfirm,
+  onFilterChange,
 }: {
   height: number;
   width: number;
@@ -46,12 +59,25 @@ export function FileBrowser({
   selected?: string[];
   onToggle?: (path: string) => void;
   onConfirm?: () => void;
+  onFilterChange?: (active: boolean) => void;
 }) {
   const [showHidden, setShowHidden] = useState(false);
   const [cursor, setCursor] = useState(0);
+  // null = not filtering; "" = filter open but empty.
+  const [filter, setFilterState] = useState<string | null>(null);
+  const setFilter = (next: string | null): void => {
+    setFilterState(next);
+    setCursor(0);
+  };
+  const filtering = filter !== null;
+  useEffect(() => onFilterChange?.(filtering), [filtering, onFilterChange]);
+  // Leaving the browser (unmount) must not leave the parent thinking we filter.
+  useEffect(() => () => onFilterChange?.(false), [onFilterChange]);
+
   const setDir = (next: string): void => {
     onNavigate(next);
     setCursor(0);
+    setFilterState(null);
   };
 
   const onDrives = dir === DRIVES;
@@ -59,10 +85,14 @@ export function FileBrowser({
     () => (onDrives ? listDrives() : listDir(dir, { showHidden, accept })),
     [dir, showHidden, onDrives, accept],
   );
+  const shownEntries = useMemo(
+    () => (filter ? entries.filter((e) => matchesFilter(e.name, filter)) : entries),
+    [entries, filter],
+  );
 
   const atRoot = !onDrives && isRoot(dir);
-  const showUp = !onDrives && (!atRoot || IS_WIN);
-  const rows: (Entry | "up")[] = showUp ? ["up", ...entries] : entries;
+  const showUp = !onDrives && !filtering && (!atRoot || IS_WIN);
+  const rows: (Entry | "up")[] = showUp ? ["up", ...shownEntries] : shownEntries;
 
   const clamped = Math.min(cursor, Math.max(0, rows.length - 1));
   const listH = Math.max(2, height - 1); // one line for the path crumb
@@ -89,20 +119,36 @@ export function FileBrowser({
 
   useInput(
     (input, key) => {
-      if (rows.length === 0) {
-        if (key.leftArrow || key.backspace || key.delete) goUp();
+      if (key.upArrow) {
+        if (rows.length) setCursor(wrapStep(clamped, -1, rows.length));
         return;
       }
-      if (key.upArrow) setCursor(wrapStep(clamped, -1, rows.length));
-      else if (key.downArrow) setCursor(wrapStep(clamped, 1, rows.length));
-      else if (key.leftArrow || key.backspace || key.delete) goUp();
-      else if (key.return || key.rightArrow) {
+      if (key.downArrow) {
+        if (rows.length) setCursor(wrapStep(clamped, 1, rows.length));
+        return;
+      }
+      if (key.return || key.rightArrow) {
         const row = rows[clamped];
         if (row) onRow(row);
-      } else if (input === " " && multi) {
+        return;
+      }
+      if (input === " " && multi) {
         const row = rows[clamped];
         if (row && row !== "up" && !row.isDir) onToggle?.(row.path);
-      } else if (input === "h" && !onDrives) {
+        return;
+      }
+
+      if (filter !== null) {
+        if (key.escape) setFilter(null);
+        else if (key.backspace || key.delete) setFilter(filter.length ? filter.slice(0, -1) : null);
+        else if (key.leftArrow) goUp();
+        else if (input && !key.ctrl && !key.meta && !key.tab) setFilter(filter + input.replace(/[\r\n]/g, ""));
+        return;
+      }
+
+      if (key.leftArrow || key.backspace || key.delete) goUp();
+      else if (input === "/") setFilter("");
+      else if (input === "h" && !onDrives) {
         setShowHidden((v) => !v);
         setCursor(0);
       }
@@ -110,18 +156,46 @@ export function FileBrowser({
     { isActive },
   );
 
-  const crumb = onDrives ? "Select a drive" : truncateLeft(dir, Math.max(8, width - 4));
+  const count = onDrives
+    ? ""
+    : `${shownEntries.length} item${shownEntries.length === 1 ? "" : "s"}${showHidden ? " · hidden shown" : ""}`;
+  const crumb = onDrives ? "Select a drive" : truncateLeft(dir, Math.max(8, width - count.length - 4));
 
   return (
     <Box flexDirection="column">
-      <Box>
-        <Text color={COLOR.alt} wrap="truncate-start">
-          {crumb}
-        </Text>
-      </Box>
+      {filtering ? (
+        <Box>
+          <Text color={COLOR.fox}>/ </Text>
+          <Text color={COLOR.text}>{filter}</Text>
+          {isActive ? <Text color={COLOR.fox}>▏</Text> : null}
+          <Box flexGrow={1} />
+          <Box flexShrink={0} marginLeft={2}>
+            <Text dimColor>{`${shownEntries.length} match${shownEntries.length === 1 ? "" : "es"}`}</Text>
+          </Box>
+        </Box>
+      ) : (
+        <Box>
+          <Box flexGrow={1} minWidth={0}>
+            <Text color={COLOR.alt} wrap="truncate-start">
+              {crumb}
+            </Text>
+          </Box>
+          {count ? (
+            <Box flexShrink={0} marginLeft={2}>
+              <Text dimColor>{count}</Text>
+            </Box>
+          ) : null}
+        </Box>
+      )}
       {rows.length === 0 ? (
         <Box marginTop={1}>
-          <Text dimColor>{onDrives ? "No drives found." : emptyHint}</Text>
+          <Text dimColor>
+            {onDrives
+              ? "No drives found."
+              : filtering
+                ? "No matches — backspace to widen, esc to clear."
+                : emptyHint}
+          </Text>
         </Box>
       ) : (
         visible.map((row, i) => {

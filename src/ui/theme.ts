@@ -18,9 +18,14 @@ export const COLOR = {
 export const RULE = "#6b6257";
 export const GUTTER = 2;
 
+// Dark ink for text sitting on an orange "pill" background.
+export const INK = "#1c140c";
+
 export const ICON = {
   done: "✓",
   fail: "✗",
+  cancelled: "⊘",
+  queued: "◌",
   pending: "·",
   pointer: "❯",
   dot: "·",
@@ -29,7 +34,15 @@ export const ICON = {
   file: "•",
   media: "♪",
   up: "↑",
+  grab: "↓",
+  convert: "⇄",
+  pdf: "▤",
+  queue: "≡",
+  info: "›",
 } as const;
+
+// Braille spinner frames, advanced by the shared ticker (see useFrame).
+export const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;
 
 function rgb(hex: string): [number, number, number] {
   const n = parseInt(hex.slice(1), 16);

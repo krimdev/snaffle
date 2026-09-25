@@ -40,7 +40,11 @@ export function Panel({ title, width, focused, count, height, children }: PanelP
         paddingX={1}
         overflow="hidden"
       >
-        {children}
+        {/* Never shrink: content taller than the panel is clipped at the bottom
+            instead of Yoga squeezing rows on top of each other. */}
+        <Box flexDirection="column" flexShrink={0}>
+          {children}
+        </Box>
       </Box>
     </Box>
   );

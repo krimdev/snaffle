@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { homedir } from "node:os";
 import { Panel } from "../components/Panel";
 import { FileBrowser } from "../components/FileBrowser";
 import { ConvertMenu } from "../components/ConvertMenu";
@@ -7,6 +6,7 @@ import { TrimInput } from "../components/TrimInput";
 import { targetsFor, type ConvertTarget } from "../../convert/targets";
 import { isMediaFile } from "../../core/files";
 import { ICON } from "../theme";
+import { saveState, startDir } from "../../util/state";
 
 // The "pick a file" screen. Steps: browse to a file → choose a format → (for
 // Trim) enter start/end. `picked` and `trimming` are owned by App so Esc routes
@@ -20,6 +20,7 @@ export function Convert({
   onPick,
   onChoose,
   onTrim,
+  onFilterChange,
 }: {
   width: number;
   height: number;
@@ -29,9 +30,15 @@ export function Convert({
   onPick: (path: string) => void;
   onChoose: (target: ConvertTarget) => void;
   onTrim: (from: number, to: number) => void;
+  onFilterChange?: (active: boolean) => void;
 }) {
   // Held here (not in FileBrowser) so the location survives the format-menu step.
-  const [dir, setDir] = useState<string>(() => homedir());
+  // Opens where you last browsed (remembered across runs).
+  const [dir, setDirState] = useState<string>(startDir);
+  const setDir = (next: string): void => {
+    setDirState(next);
+    if (next) saveState({ lastDir: next });
+  };
   const inner = Math.max(10, width - 4);
   return (
     <Panel title="convert" width={width} height={height} focused={focused}>
@@ -56,6 +63,7 @@ export function Convert({
           fileIcon={ICON.media}
           emptyHint="No videos or audio here — only convertible files show. ← to go back."
           onPick={onPick}
+          onFilterChange={onFilterChange}
         />
       )}
     </Panel>

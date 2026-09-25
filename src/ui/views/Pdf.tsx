@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { basename } from "node:path";
-import { homedir } from "node:os";
 import { Panel } from "../components/Panel";
 import { FileBrowser } from "../components/FileBrowser";
 import { TextField } from "../components/TextField";
@@ -11,6 +10,7 @@ import { parsePageRange } from "../../pdf/range";
 import { wrapStep } from "../move";
 import { COLOR, GUTTER, ICON } from "../theme";
 import type { PdfStep } from "../keymap";
+import { saveState, startDir } from "../../util/state";
 
 type Action = "images" | "merge" | "split";
 type Step = "menu" | "pick" | "range";
@@ -28,6 +28,7 @@ export function Pdf({
   onRunJob,
   onExit,
   onStep,
+  onFilterChange,
 }: {
   width: number;
   height: number;
@@ -35,11 +36,25 @@ export function Pdf({
   onRunJob: (title: string, run: () => Promise<string>) => void;
   onExit: () => void;
   onStep: (step: PdfStep) => void;
+  onFilterChange?: (active: boolean) => void;
 }) {
   const [step, setStep] = useState<Step>("menu");
   const [action, setAction] = useState<Action>("images");
   const [cursor, setCursor] = useState(0);
-  const [dir, setDir] = useState<string>(() => homedir());
+  const [dir, setDirState] = useState<string>(startDir);
+  const setDir = (next: string): void => {
+    setDirState(next);
+    if (next) saveState({ lastDir: next });
+  };
+  // While the browser's filter is open, Esc belongs to it (clears the filter).
+  const [filtering, setFiltering] = useState(false);
+  const onFilter = useCallback(
+    (active: boolean) => {
+      setFiltering(active);
+      onFilterChange?.(active);
+    },
+    [onFilterChange],
+  );
   const [selected, setSelected] = useState<string[]>([]);
   const [picked, setPicked] = useState<string | null>(null);
   const [pageCount, setPageCount] = useState<number | null>(null);
@@ -62,7 +77,7 @@ export function Pdf({
   // Esc walks back a step; from the menu it leaves the pane entirely.
   useInput(
     (_input, key) => {
-      if (!key.escape) return;
+      if (!key.escape || filtering) return;
       if (step === "menu") onExit();
       else if (step === "range") {
         setStep("pick");
@@ -120,18 +135,20 @@ export function Pdf({
       });
   };
 
-  const submitRange = (value: string): void => {
-    if (!picked || pageCount === null) return;
+  const submitRange = (value: string): boolean => {
+    if (!picked || pageCount === null) return false;
     try {
       const indices = parsePageRange(value, pageCount);
       onRunJob(`Split ${basename(picked)} (${value.trim()})`, () => splitPdf(picked, indices));
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      return false;
     }
   };
 
   const inner = Math.max(10, width - 4);
-  const title = `pdf${step === "menu" ? "" : ` · ${ACTIONS.find((a) => a.id === action)!.label}`}`;
+  const title = `PDF${step === "menu" ? "" : ` · ${ACTIONS.find((a) => a.id === action)!.label}`}`;
 
   return (
     <Panel title={title} width={width} height={height} focused={focused}>
@@ -198,6 +215,7 @@ export function Pdf({
             onToggle={toggle}
             onConfirm={confirmMulti}
             onPick={pickSingle}
+            onFilterChange={onFilter}
           />
           <Box marginTop={0}>
             {error ? (
@@ -207,8 +225,8 @@ export function Pdf({
             ) : (
               <Text dimColor wrap="truncate-end">
                 {multi
-                  ? `${selected.length} selected · space toggle · ↵ create`
-                  : "↵ pick a PDF to split"}
+                  ? `${selected.length} selected · space toggle · ↵ create · / filter`
+                  : "↵ pick a PDF to split · / filter"}
               </Text>
             )}
           </Box>

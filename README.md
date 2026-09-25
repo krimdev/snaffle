@@ -41,12 +41,18 @@ Works with YouTube, TikTok, Facebook, Instagram, X, and 1000+ more (anything
 the screen:
 
 - **Video · MP4** — best video + audio, merged, with a quality picker (Best / 1080p / 720p / 480p)
-- **Audio · MP3** — just the sound, extracted to MP3
+- **Audio · MP3** — just the sound, extracted to MP3, with a bitrate picker (Best / 320k / 192k / 128k)
+
+Copied a link already? snaffle spots it in your clipboard — just press `↵`. The
+field tells you as you type whether it's a link it recognizes (*YouTube ✓*), and
+downloads show the video's real title, channel and length instead of a raw URL.
+Drop a video file onto the terminal and it goes straight to Convert.
 
 **Convert — browse to a file**
 No typing paths: a built-in file browser lets you arrow to any file (and switch
-drives on Windows). It only shows the media you can actually convert, then offers
-the formats that make sense:
+drives on Windows), press `/` to filter by name, and it reopens where you left
+off. It only shows the media you can actually convert, then shows what the file
+is (resolution, codec, length, size) and offers the formats that make sense:
 
 | Input | Convert to |
 | --- | --- |
@@ -66,17 +72,21 @@ Three keyboard-driven tools (powered by pure-JS [pdf-lib](https://github.com/Hop
 
 **Queue**
 Downloads, conversions and PDF jobs run together with live progress, speed and
-ETA, newest first.
+ETA, newest first. Pick a finished task to **open** it (`o`) or **show it in its
+folder** (`f`); **cancel** a running one (`x`) or **retry** a failure (`r`).
+The terminal tab shows overall progress (in Windows Terminal, the taskbar too)
+and a bell rings when everything you started is done — so you can switch away.
 
 ## Keys
 
-`tab` switch pane · `↑↓` move · `↵` open / pick · `←` up a folder · `esc` back ·
-`q` quit. The bar at the bottom always shows what's available where you are.
+`tab` switch pane · `↑↓` move · `↵` open / pick · `←` up a folder · `/` filter ·
+`esc` back · `?` all keys · `q` quit. The bar at the bottom always shows what's
+available where you are.
 
 ## Roadmap
 
 - PDF: compress, reorder/rotate pages
-- Pause / resume / cancel in the queue
+- Pause / resume in the queue
 - Subtitles / thumbnail options on download
 
 ## A note on usage

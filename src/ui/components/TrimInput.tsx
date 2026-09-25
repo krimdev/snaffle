@@ -18,12 +18,14 @@ export function TrimInput({
 }) {
   const [error, setError] = useState<string | null>(null);
 
-  const submit = (value: string): void => {
+  const submit = (value: string): boolean => {
     try {
       const { from, to } = parseTrim(value);
       onSubmit(from, to);
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      return false;
     }
   };
 

@@ -1,11 +1,14 @@
 import { Box, Text } from "ink";
 import { Logo } from "./Logo";
 import { LOGO_WIDTH } from "../logo";
+import { useSweep } from "../useFrame";
 import { COLOR, ICON } from "../theme";
 
-// Opening card: the wordmark, the pitch, the supported sources. App dismisses it
-// on a timer or the first keypress.
-export function Splash({ rows, cols }: { rows: number; cols: number }) {
+// Opening card: the wordmark with a glint sweeping across it, the pitch, the
+// supported sources. App dismisses it on a timer or the first keypress.
+export function Splash({ rows, cols, durationMs }: { rows: number; cols: number; durationMs: number }) {
+  // One sweep over ~70% of the splash, then rest.
+  const shine = useSweep(1, durationMs * 0.7);
   const showLogo = cols >= LOGO_WIDTH + 2;
   return (
     <Box
@@ -15,7 +18,7 @@ export function Splash({ rows, cols }: { rows: number; cols: number }) {
       alignItems="center"
     >
       {showLogo ? (
-        <Logo />
+        <Logo shine={shine} />
       ) : (
         <Text color={COLOR.accent} bold>
           snaffle
