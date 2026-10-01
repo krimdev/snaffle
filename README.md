@@ -30,7 +30,9 @@ it. **Everything happens on your machine; nothing is uploaded anywhere.**
    ```
 
 That's it. The yt-dlp and ffmpeg binaries snaffle needs are fetched
-automatically the first time, so there's nothing to install by hand. Finished
+automatically the first time, so there's nothing to install by hand — and
+yt-dlp keeps itself up to date in the background, so downloads keep working
+when sites change. Finished
 files land in your `Downloads/snaffle` folder.
 
 ## What it does

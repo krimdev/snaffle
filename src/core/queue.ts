@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { statSync } from "node:fs";
 import { basename } from "node:path";
-import { runDownload } from "../download/ytdlp";
+import { runDownloadFresh } from "../download/update";
 import { runConvert } from "../convert/ffmpeg";
 import { targetById, DEFAULT_TARGET } from "../convert/targets";
 import { CancelledError } from "./errors";
@@ -176,11 +176,13 @@ export class TaskQueue extends EventEmitter {
     const run = job
       ? job((f) => onProgress(f), ctl.signal)
       : task.kind === "download"
-        ? runDownload(
+        ? runDownloadFresh(
             task.url ?? task.title,
             outputDir(),
             {
               onProgress,
+              onUpdating: (retrying) =>
+                onProgress(undefined, retrying ? "Updating the downloader, then retrying…" : "Updating the downloader…"),
               onMeta: (meta) => {
                 task.title = meta.title;
                 task.subtitle = [meta.uploader, meta.duration].filter(Boolean).join(" · ") || undefined;

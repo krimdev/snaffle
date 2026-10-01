@@ -16,6 +16,7 @@ import { wrapStep } from "./move";
 import { useSweep } from "./useFrame";
 import { useTerminalStatus } from "./useTerminalStatus";
 import { runTrim } from "../convert/ffmpeg";
+import { onUpdate } from "../download/update";
 import { isImageFile, isMediaFile, isPdfFile } from "../core/files";
 import { outputDir } from "../util/paths";
 import { loadState, saveState } from "../util/state";
@@ -94,6 +95,17 @@ export function App({ queue }: { queue: TaskQueue }) {
       queue.off("settled", onSettled);
     };
   }, [queue]);
+
+  // yt-dlp refreshes itself quietly; only say so when it actually changed.
+  useEffect(
+    () =>
+      onUpdate((e) => {
+        if (e.phase === "done" && e.updated) {
+          setNotice({ kind: "success", text: `Downloader updated${e.version ? ` to ${e.version}` : ""}` });
+        }
+      }),
+    [],
+  );
 
   useTerminalStatus(tasks);
 

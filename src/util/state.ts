@@ -7,6 +7,8 @@ import { dirname, join } from "node:path";
 export interface State {
   lastDir?: string;
   launches?: number;
+  // When we last asked yt-dlp to update itself (ms since epoch).
+  ytdlpCheckedAt?: number;
 }
 
 function statePath(): string {

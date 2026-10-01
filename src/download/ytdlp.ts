@@ -145,6 +145,10 @@ export async function runDownload(
     ],
     noSimulate: true,
     progress: true,
+    // YouTube now needs a JavaScript runtime to unlock most formats (without
+    // one, downloads die with HTTP 403). yt-dlp only looks for deno by default;
+    // we're running on Node, so hand it that.
+    jsRuntimes: `node:${process.execPath}` as const,
     ...(ffmpegPath ? { ffmpegLocation: ffmpegPath } : {}),
   };
 
